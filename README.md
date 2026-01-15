@@ -1,31 +1,42 @@
-# Microsoft Foundry Agent Deployment
+# 🤖 Microsoft Foundry Agent Deployment
 
 A .NET console application for deploying and managing Microsoft Foundry Agents using YAML configuration files. This tool automates the deployment of AI agents with OpenAPI-based tools to Azure AI Foundry projects.
 
-## Overview
+## 📖 Background
+
+This project was created to simplify the creation of **persistent agents** in Microsoft AI Foundry (classic portal). Since Azure AI Foundry does not currently provide an Infrastructure as Code (IaC) way to create agents, and the new Foundry portal displays agents as YAML code, this tool brings similar YAML-based configuration capabilities to the classic portal.
+
+**⚠️ Important Disclaimers:**
+- This tool is designed for **classic agents** in Azure AI Foundry
+- Currently implements **OpenAPI Tools** and **Connected Agents** - other tool types can be added in the future
+- The YAML format used by this tool differs from the new portal's YAML format, so migrating to the new portal would require code modifications
+
+## 🚀 Overview
 
 DeployAgent is a deployment automation tool that:
 - Reads agent and tool definitions from YAML configuration files
 - Creates agents in Azure AI Foundry projects
 - Configures agents with OpenAPI-based tools
+- Supports connected agents for multi-agent orchestration
 - Supports bulk deployment of multiple agents
 
-## Features
+## ✨ Features
 
-- **YAML-based Configuration**: Define agents and tools in a simple, declarative format
-- **OpenAPI Tool Integration**: Automatically fetches and configures OpenAPI specifications for agent tools
-- **Azure Identity Integration**: Uses DefaultAzureCredential for secure authentication
-- **Batch Deployment**: Deploy multiple agents from a single configuration file
-- **Error Handling**: Comprehensive error messages and validation
+- **📝 YAML-based Configuration**: Define agents and tools in a simple, declarative format
+- **🔌 OpenAPI Tool Integration**: Automatically fetches and configures OpenAPI specifications for agent tools
+- **🔗 Connected Agents**: Support for multi-agent orchestration where agents can use other agents as tools
+- **🔐 Azure Identity Integration**: Uses DefaultAzureCredential for secure authentication
+- **📦 Batch Deployment**: Deploy multiple agents from a single configuration file
+- **🛡️ Error Handling**: Comprehensive error messages and validation
 
-## Prerequisites
+## 📋 Prerequisites
 
 - .NET 10.0 SDK or later
 - Azure subscription with access to Azure AI Foundry
 - Azure credentials configured (via Azure CLI, environment variables, or managed identity)
 - An Azure AI Foundry project
 
-## Configuration
+## ⚙️ Configuration
 
 ### agents.yaml
 
@@ -49,7 +60,51 @@ tools:
     description: Retrieves weather information for a given location.
 ```
 
-## Usage
+#### Connected Agents (Multi-Agent Orchestration)
+
+You can create connected agent systems where agents use other agents as tools. This enables complex workflows with specialized agents:
+
+```yaml
+agents:
+  - type: agent
+    name: EmployeeInfoAgent
+    model: gpt-4o-mini-deployment
+    instructions: |
+      You retrieve and provide employee CV information...
+    tools:
+      - EmployeeAPI
+
+  - type: agent
+    name: OrchestratorAgent
+    model: gpt-4o-mini-deployment
+    instructions: |
+      You coordinate multiple specialized agents to fulfill user requests...
+    tools:
+      - EmployeeInfoAgent  # Reference to another agent
+      - ConverterAgent
+
+tools:
+  - type: tool
+    kind: OpenAPI
+    name: EmployeeAPI
+    spec_url: https://api.example.com/employees/openapi.json
+    description: Retrieves employee information.
+
+  # Define agents as tools for other agents
+  - type: tool
+    kind: agent
+    name: EmployeeInfoAgent
+    description: Retrieves and formats employee CV information.
+
+  - type: tool
+    kind: agent
+    name: ConverterAgent
+    description: Converts content to different formats.
+```
+
+See [sample/multi-agents.yaml](sample/multi-agents.yaml) for a complete connected agent example.
+
+## 💻 Usage
 
 ### Basic Usage
 
@@ -78,54 +133,56 @@ dotnet run -- sample/agents.yaml -p https://your-project.services.ai.azure.com/a
 dotnet run --project src/DeployAgent/DeployAgent.csproj -- path/to/agents.yaml --project-endpoint https://your-project.services.ai.azure.com/api/projects/your-project --tenant-id your-tenant-id
 ```
 
-## Project Structure
+## ⚡ How It Works
 
+1. **📥 Configuration Loading**: Reads command-line arguments
+2. **📄 YAML Parsing**: Parses the YAML file with de agent and tool definitions
+3. **🌐 OpenAPI Fetching**: Downloads OpenAPI specifications for each tool
+4. **🏗️ Agent Creation**: Creates agents in Azure AI Foundry with configured tools
+5. **🚀 Deployment**: Deploys all agents and reports success/failure
+
+## 🔑 Service Principal for CI/CD Pipelines
+
+For automated deployments in CI/CD pipelines, you'll need to create a service principal with appropriate permissions.
+
+### 👤 Creating a Service Principal
+
+```bash
+# Create a service principal
+az ad sp create-for-rbac --name "DeployAgentSP" --role contributor --scopes /subscriptions/{subscription-id}
 ```
-│   └── DeployAgent/
-│       ├── Program.cs                  # Application entry point
-│       ├── DeployAgent.csproj          # Project file
-│       ├── appsettings.json            # Configuration settings
-│       ├── Models/
-│       │   ├── AgentDefinition.cs      # Agent model
-│       │   ├── ToolDefinition.cs       # Tool model
-│       │   └── DefinitionBase.cs       # Base definition class
-│       └── Services/
-│           ├── AgentDefinitionService.cs      # YAML parsing service
-│           ├── AgentDeploymentService.cs      # Agent deployment service
-│           ├── ConfigurationService.cs        # Configuration management
-│           └── OpenApiService.cs              # OpenAPI spec fetching
-└── sample/
-    └── agents.yaml                     # Sample configuration
+
+This command will output credentials including:
+- `appId` (Client ID)
+- `password` (Client Secret)
+- `tenant` (Tenant ID)
+
+**🔒 Important**: Save these credentials securely. The client secret will only be shown once.
+
+### Assigning Azure AI User Role
+
+After creating the service principal, assign the Azure AI User role at the resource group level:
+
+```bash
+az role assignment create \
+  --assignee {appId-from-previous-step} \
+  --role "Azure AI User" \
+  --scope /subscriptions/{subscriptId}/resourceGroups/{resourceGroupName}
 ```
 
-## Dependencies
+### Using Service Principal in Pipelines
 
-- **Azure.AI.Agents.Persistent** (v1.1.0): Azure AI Agents SDK
-- **Azure.Identity** (v1.17.1): Azure authentication
-- **Microsoft.Extensions.Configuration** (v10.0.0): Configuration management
-- **YamlDotNet** (v16.2.1): YAML parsing
+Set the following environment variables in your CI/CD pipeline:
 
-## How It Works
+```bash
+export AZURE_CLIENT_ID="{appId}"
+export AZURE_CLIENT_SECRET="{password}"
+export AZURE_TENANT_ID="{tenant}"
+```
 
-1. **Configuration Loading**: Reads `appsettings.json` and command-line arguments
-2. **YAML Parsing**: Parses the YAMLcommand-line arguments for project endpoint and YAML file path
-3. **OpenAPI Fetching**: Downloads OpenAPI specifications for each tool
-4. **Agent Creation**: Creates agents in Azure AI Foundry with configured tools
-5. **Deployment**: Deploys all agents and reports success/failure
+With these variables set, `DefaultAzureCredential` will automatically use the service principal for authentication.
 
-## Authentication
-
-The application uses `DefaultAzureCredential` which supports multiple authentication methods in the following order:
-1. Environment variables
-2. Managed Identity
-3. Visual Studio
-4. Azure CLI
-5. Azure PowerShell
-6. Interactive browser
-
-Ensure you're authenticated via one of these methods before running the application.
-
-## Error Handling
+## 🛡️ Error Handling
 
 The application provides detailed error messages for common issues:
 - Missing or invalid YAML file
@@ -134,27 +191,10 @@ The application provides detailed error messages for common issues:
 - Agent creation errors
 - OpenAPI specification fetch failures
 
-## Example Output
-
-```
-=== Agent Deployment System ===
-
-Using YAML file: sample/agents.yaml
-
-Initializing Agent Orchestration Service...
-
-=== Starting Agent Creation Process ===
-
-Creating agent: WeatherAgent
-✓ Successfully created agent: WeatherAgent
-
-=== Successfully deployed 1 agent(s) ===
-```
-
-## License
+## 📄 License
 
 See the [LICENSE](LICENSE) file for details.
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit issues and pull requests.
