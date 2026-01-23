@@ -1,20 +1,23 @@
-using Azure;
-using Azure.AI.Agents.Persistent;
+using Azure.AI.Projects;
+using Azure.AI.Projects.OpenAI;
 using Azure.Identity;
-using DeployAgent.Models;
-using AzureToolDefinition = Azure.AI.Agents.Persistent.ToolDefinition;
+using DeployAgent.Core.Abstractions;
+using DeployAgent.Core.Models;
+using DeployAgent.Core.Services;
+using CoreAgentDefinition = DeployAgent.Core.Models.AgentDefinition;
+using CoreToolDefinition = DeployAgent.Core.Models.ToolDefinition;
 
-namespace DeployAgent.Services;
+namespace DeployAgent.V2.Services;
 
-public class AgentDeploymentService
+public class AIProjectAgentDeploymentService : IAgentDeploymentService
 {
-    private readonly PersistentAgentsClient _client;
+    private readonly AIProjectClient _projectClient;
     private readonly AgentDefinitionService _definitionService;
     private readonly OpenApiService _openApiService;
-    private readonly Dictionary<string, PersistentAgent> _createdAgents;
+    private readonly Dictionary<string, AgentReference> _createdAgents;
     private readonly Dictionary<string, byte[]> _openApiSpecs;
 
-    public AgentDeploymentService(
+    public AIProjectAgentDeploymentService(
         string projectEndpoint,
         string? tenantId,
         AgentDefinitionService definitionService,
@@ -28,7 +31,7 @@ public class AgentDeploymentService
         ArgumentNullException.ThrowIfNull(definitionService);
         ArgumentNullException.ThrowIfNull(openApiService);
 
-        Console.WriteLine("Initializing Agent Deployment Service...");
+        Console.WriteLine("Initializing AI Project Client (V2)...");
 
         var credentialOptions = new DefaultAzureCredentialOptions();
         if (!string.IsNullOrEmpty(tenantId))
@@ -37,15 +40,17 @@ public class AgentDeploymentService
         }
 
         var credentials = new DefaultAzureCredential(credentialOptions);
-        _client = new PersistentAgentsClient(projectEndpoint, credentials);
+
+        // Connect to your project using the endpoint from your project page
+        _projectClient = new AIProjectClient(endpoint: new Uri(projectEndpoint), tokenProvider: credentials);
+        
         _definitionService = definitionService;
         _openApiService = openApiService;
-        _createdAgents = new Dictionary<string, PersistentAgent>(StringComparer.OrdinalIgnoreCase);
+        _createdAgents = new Dictionary<string, AgentReference>(StringComparer.OrdinalIgnoreCase);
         _openApiSpecs = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
     }
 
-    public async Task<Dictionary<string, PersistentAgent>> CreateAllAgentsAsync(
-        Dictionary<string, string>? placeholders = null)
+    public async Task<int> CreateAllAgentsAsync(Dictionary<string, string>? placeholders = null)
     {
         Console.WriteLine("\n=== Starting Agent Deployment Process ===\n");
 
@@ -64,10 +69,15 @@ public class AgentDeploymentService
         }
 
         Console.WriteLine($"\n=== All {_createdAgents.Count} agents created successfully! ===\n");
-        return new Dictionary<string, PersistentAgent>(_createdAgents, StringComparer.OrdinalIgnoreCase);
+        return _createdAgents.Count;
     }
 
-    private async Task<(List<AgentDefinition> Agents, List<Models.ToolDefinition> Tools)> ParseDefinitionsAsync()
+    public bool HasAgent(string agentName)
+    {
+        return _createdAgents.ContainsKey(agentName);
+    }
+
+    private async Task<(List<CoreAgentDefinition> Agents, List<CoreToolDefinition> Tools)> ParseDefinitionsAsync()
     {
         Console.WriteLine("Parsing agent definitions...");
 
@@ -83,7 +93,7 @@ public class AgentDeploymentService
         }
     }
 
-    private void ValidateDefinitions(List<AgentDefinition> agents, List<Models.ToolDefinition> tools)
+    private void ValidateDefinitions(List<CoreAgentDefinition> agents, List<CoreToolDefinition> tools)
     {
         var (isValid, validationErrors) = _definitionService.ValidateDefinitions(agents, tools);
 
@@ -100,7 +110,7 @@ public class AgentDeploymentService
         Console.WriteLine("✓ All definitions validated successfully.");
     }
 
-    private async Task DownloadOpenApiSpecificationsAsync(List<Models.ToolDefinition> toolDefinitions)
+    private async Task DownloadOpenApiSpecificationsAsync(List<CoreToolDefinition> toolDefinitions)
     {
         var openApiTools = toolDefinitions
             .Where(t => t.Kind.Equals("OpenAPI", StringComparison.OrdinalIgnoreCase))
@@ -137,18 +147,18 @@ public class AgentDeploymentService
         Console.WriteLine();
     }
 
-    private async Task<PersistentAgent> CreateAgentAsync(
-        AgentDefinition agentDef,
-        List<Models.ToolDefinition> toolDefinitions,
+    private async Task<AgentReference> CreateAgentAsync(
+        CoreAgentDefinition agentDef,
+        List<CoreToolDefinition> toolDefinitions,
         Dictionary<string, string>? placeholders = null)
     {
         Console.WriteLine($"Creating agent: {agentDef.Name}");
 
         var instructions = ReplacePlaceholders(agentDef.Instructions, placeholders);
-        var agentTools = await BuildToolsForAgentAsync(agentDef, toolDefinitions);
-        var agent = await GetOrCreateAgentAsync(agentDef.Name, agentDef.Model, instructions, agentTools);
-
-        Console.WriteLine($"  ✓ Agent '{agentDef.Name}' created with {agentTools.Count} tool(s)\n");
+        var openApiTools = await BuildToolsForAgentAsync(agentDef, toolDefinitions);
+        var agent = await GetOrCreateAgentAsync(agentDef.Name, agentDef.Model, instructions, openApiTools);
+        
+        Console.WriteLine($"  ✓ Agent '{agentDef.Name}' created with {openApiTools.Length} tool(s)\n");
         return agent;
     }
 
@@ -167,11 +177,11 @@ public class AgentDeploymentService
         return result;
     }
 
-    private async Task<List<AzureToolDefinition>> BuildToolsForAgentAsync(
-        AgentDefinition agentDef,
-        List<Models.ToolDefinition> toolDefinitions)
+    private async Task<OpenAPIAgentTool[]> BuildToolsForAgentAsync(
+        CoreAgentDefinition agentDef,
+        List<CoreToolDefinition> toolDefinitions)
     {
-        var agentTools = new List<AzureToolDefinition>();
+        var agentTools = new List<OpenAPIAgentTool>();
 
         foreach (var toolName in agentDef.Tools)
         {
@@ -192,21 +202,14 @@ public class AgentDeploymentService
                     Console.WriteLine($"  + Added OpenAPI tool: {toolDef.Name}");
                 }
             }
-            else if (toolDef.Kind.Equals("agent", StringComparison.OrdinalIgnoreCase))
-            {
-                var connectedAgentTool = CreateConnectedAgentTool(toolDef);
-                if (connectedAgentTool != null)
-                {
-                    agentTools.Add(connectedAgentTool);
-                    Console.WriteLine($"  + Added connected agent tool: {toolDef.Name}");
-                }
-            }
+            // Note: Agent-to-agent connections might use different approach in V2
+            // This can be extended in the future if the V2 SDK supports it
         }
 
-        return agentTools;
+        return agentTools.ToArray();
     }
 
-    private OpenApiToolDefinition? CreateOpenApiTool(Models.ToolDefinition toolDef)
+    private OpenAPIAgentTool? CreateOpenApiTool(CoreToolDefinition toolDef)
     {
         if (!_openApiSpecs.TryGetValue(toolDef.Name, out var spec))
         {
@@ -214,110 +217,71 @@ public class AgentDeploymentService
             return null;
         }
 
-        var oaiAuth = new OpenApiAnonymousAuthDetails();
-        return new OpenApiToolDefinition(
+        OpenAPIFunctionDefinition toolDefinition = new(
             name: toolDef.Name,
-            description: toolDef.Description,
             spec: BinaryData.FromBytes(spec),
-            openApiAuthentication: oaiAuth,
-            defaultParams: ["format"]
+            auth: new OpenAPIAnonymousAuthenticationDetails()
         );
+        toolDefinition.Description = toolDef.Description;
+        
+        OpenAPIAgentTool openapiTool = new(toolDefinition);
+        return openapiTool;
     }
 
-    private ConnectedAgentToolDefinition? CreateConnectedAgentTool(Models.ToolDefinition toolDef)
-    {
-        if (!_createdAgents.TryGetValue(toolDef.Name, out var referencedAgent))
-        {
-            Console.WriteLine($"  ⚠ Warning: Referenced agent '{toolDef.Name}' not yet created");
-            return null;
-        }
-
-        return new ConnectedAgentToolDefinition(
-            new ConnectedAgentDetails(
-                id: referencedAgent.Id,
-                name: referencedAgent.Name,
-                description: toolDef.Description
-            )
-        );
-    }
-
-    private async Task<PersistentAgent> GetOrCreateAgentAsync(
+    private async Task<AgentReference> GetOrCreateAgentAsync(
         string agentName,
-        string modelDeploymentName,
+        string model,
         string instructions,
-        List<AzureToolDefinition> tools)
+        OpenAPIAgentTool[] openAPIAgentTools)
     {
-        PersistentAgent? agent = null;
+        Console.WriteLine($"Checking if agent '{agentName}' already exists...");
 
         try
         {
-            agent = FindExistingAgent(agentName);
+            AgentRecord agentRecord = await _projectClient.Agents.GetAgentAsync(agentName);
+
+            if (agentRecord != null)
+            {
+                Console.WriteLine($"Agent retrieved (name: {agentRecord.Name}, id: {agentRecord.Id})");
+                return agentRecord;
+            }
+        }
+        catch
+        {
+            Console.WriteLine($"No agent found");
+        }
+
+        Console.WriteLine($"Creating agent '{agentName}'...");
+
+        try
+        {
+            PromptAgentDefinition agentDefinition = new PromptAgentDefinition(model)
+            {
+                Instructions = instructions,
+            };
+            
+            if (openAPIAgentTools != null && openAPIAgentTools.Length > 0)
+            {
+                foreach (var tool in openAPIAgentTools)
+                {
+                    agentDefinition.Tools.Add(tool);
+                }
+            }
+
+            var agentVersionOptions = new AgentVersionCreationOptions(agentDefinition);
+
+            var agentVersion = _projectClient.Agents.CreateAgentVersion(
+                agentName: agentName,
+                options: agentVersionOptions
+            );
+
+            Console.WriteLine($"Agent created (name: {agentVersion.Value.Name}, id: {agentVersion.Value.Id})");
+            return agentVersion.Value;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"  ⚠ Warning: Error checking for existing agents: {ex.Message}");
+            Console.WriteLine($"Error creating agent: {ex.Message}");
+            throw;
         }
-
-        if (agent == null)
-        {
-            var toolsArray = tools.Count > 0 ? tools.ToArray() : null;
-            try
-            {
-                Console.WriteLine("  → No existing agent found, creating a new one...");
-                agent = await _client.Administration.CreateAgentAsync(
-                    model: modelDeploymentName,
-                    name: agentName,
-                    instructions: instructions,
-                    tools: toolsArray
-                );
-
-                Console.WriteLine($"  → Created new agent: {agent.Id}");
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Failed to create agent '{agentName}': {ex.Message}", ex);
-            }
-        }
-        else if (agent.Instructions != instructions || agent.Tools.Count != tools.Count)
-        {
-            Console.WriteLine("  → Updating existing agent.");
-
-            try
-            {
-                agent = await _client.Administration.UpdateAgentAsync(
-                    agent.Id,
-                    model: modelDeploymentName,
-                    instructions: instructions,
-                    tools: tools.ToArray()
-                );
-                Console.WriteLine($"  → Updated existing agent: {agent.Id}");
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"Failed to update agent '{agentName}': {ex.Message}", ex);
-            }
-        }
-
-        return agent;
-    }
-
-    private PersistentAgent? FindExistingAgent(string agentName)
-    {
-        var existingAgents = _client.Administration.GetAgents();
-        foreach (var existingAgent in existingAgents)
-        {
-            if (existingAgent.Name == agentName)
-            {
-                Console.WriteLine($"  → Found existing agent: {existingAgent.Id}");
-                return existingAgent;
-            }
-        }
-        return null;
-    }
-
-    public PersistentAgent? GetAgent(string agentName)
-    {
-        _createdAgents.TryGetValue(agentName, out var agent);
-        return agent;
     }
 }

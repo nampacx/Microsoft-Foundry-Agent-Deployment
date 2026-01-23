@@ -2,6 +2,24 @@
 
 A .NET console application for deploying and managing Microsoft Foundry Agents using YAML configuration files. This tool automates the deployment of AI agents with OpenAPI-based tools to Azure AI Foundry projects.
 
+## 🆕 New Unified Structure Available!
+
+This project now features a **unified architecture** that supports both V1 (Persistent Agents) and V2 (AI Projects) SDKs from a single CLI tool!
+
+- **Quick Start**: See [QUICKSTART.md](QUICKSTART.md)
+- **Full Documentation**: See [UNIFIED_STRUCTURE.md](UNIFIED_STRUCTURE.md)
+- **Unified CLI**: Use `DeployAgent.CLI` with `--sdk-version v1` or `v2`
+- **Legacy Projects**: Original `DeployAgent` and `DeployAgentV2` still work
+
+### Quick Example
+```powershell
+# Using V1 SDK (recommended)
+dotnet run --project src/DeployAgent.CLI agents.yaml -p <endpoint> -v v1
+
+# Using V2 SDK (beta)
+dotnet run --project src/DeployAgent.CLI agents.yaml -p <endpoint> -v v2
+```
+
 ## 📖 Background
 
 This project was created to simplify the creation of **persistent agents** in Microsoft AI Foundry (classic portal). Since Azure AI Foundry does not currently provide an Infrastructure as Code (IaC) way to create agents, and the new Foundry portal displays agents as YAML code, this tool brings similar YAML-based configuration capabilities to the classic portal.

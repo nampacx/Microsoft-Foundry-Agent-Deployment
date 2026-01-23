@@ -1,6 +1,6 @@
-namespace DeployAgent.Models;
+namespace DeployAgent.Core.Models;
 
-public class DefinitionBase
+public abstract class DefinitionBase
 {
     public string Type { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;

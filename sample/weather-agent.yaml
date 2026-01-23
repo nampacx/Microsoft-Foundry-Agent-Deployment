@@ -30,5 +30,5 @@ tools:
   - type: tool
     kind: OpenAPI
     name: WeatherServiceAPI
-    spec_url: https://nampacx-func-app.azurewebsites.net/api/openapi/v3.json
+    spec_url: https://.azurewebsites.net/api/openapi/v3.json
     description: Retrieves weather information for a given location.

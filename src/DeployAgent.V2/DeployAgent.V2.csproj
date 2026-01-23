@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.AI.Projects" Version="1.2.0-beta.4" />
+    <PackageReference Include="Azure.AI.Agents.Persistent" Version="1.1.0" />
+    <PackageReference Include="Azure.AI.Projects.OpenAI" Version="1.0.0-beta.4" />
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DeployAgent.Core\DeployAgent.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,8 +1,8 @@
-using DeployAgent.Models;
+using DeployAgent.Core.Models;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace DeployAgent.Services;
+namespace DeployAgent.Core.Services;
 
 public class AgentDefinitionService
 {

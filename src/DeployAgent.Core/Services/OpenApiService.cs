@@ -1,4 +1,4 @@
-namespace DeployAgent.Services;
+namespace DeployAgent.Core.Services;
 
 public class OpenApiService : IDisposable
 {

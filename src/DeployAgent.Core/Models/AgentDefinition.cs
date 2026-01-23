@@ -1,4 +1,4 @@
-namespace DeployAgent.Models;
+namespace DeployAgent.Core.Models;
 
 public class AgentDefinition : DefinitionBase
 {
