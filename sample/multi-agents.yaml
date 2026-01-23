@@ -83,13 +83,13 @@ tools:
   - type: tool
     kind: OpenAPI
     name: EpmloyeeInformation
-    spec_url: https://koko-agent-tool-func-app.azurewebsites.net/api/openapi/v3.json
+    spec_url: https:/.azurewebsites.net/api/openapi/v3.json
     description: Retrieve employee information like CV or profile picture for a given employee name. Profile pictures retrieval currently does not support family names (e.g., for Michael Kokonowskyj only use Michael).
 
   - type: tool
     kind: OpenAPI
     name: HTMLtoPDFConverter
-    spec_url: https://kkhtml2pdf-func-68f3dcb1.azurewebsites.net/api/openapi
+    spec_url: https://.azurewebsites.net/api/openapi
     description: |
       Convert HTML content to PDF format. 
       This tool accepts HTML markup and generates a properly formatted PDF document that can be used for reports, documentation, or file sharing. 
