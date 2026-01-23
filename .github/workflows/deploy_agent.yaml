@@ -33,4 +33,4 @@ jobs:
         AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      run: dotnet run --project src/DeployAgent/DeployAgent.csproj -- sample/weather-agent.yaml --project-endpoint ${{ env.PROJECT_ENDPOINT }}
+      run: dotnet run --project src/DeployAgentV2/DeployAgentV2.csproj -- sample/weather-agent.yaml --project-endpoint ${{ env.PROJECT_ENDPOINT }}
