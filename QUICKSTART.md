@@ -35,13 +35,9 @@ New Unified Structure (Recommended):
 ├── DeployAgent.V1        ← V1 SDK implementation
 ├── DeployAgent.V2        ← V2 SDK implementation
 └── DeployAgent.CLI       ← Unified CLI (use this!)
-
-Legacy Structure (Still works):
-├── DeployAgent           ← V1 standalone
-└── DeployAgentV2         ← V2 standalone
 ```
 
-## 🎯 Which SDK Version?
+## 🎯 Which Version?
 
 ### Use V1 if:
 - ✅ You need multi-agent orchestration (connected agents)
