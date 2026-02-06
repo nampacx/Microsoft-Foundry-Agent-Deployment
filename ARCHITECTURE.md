@@ -64,13 +64,6 @@
 
 ## Data Flow Comparison
 
-### Old Flow (Per SDK)
-```
-User → DeployAgent.exe → V1 SDK → Azure
-User → DeployAgentV2.exe → V2 SDK → Azure
-```
-
-### New Flow (Unified)
 ```
 User → DeployAgent.exe
        └─> --sdk-version v1 → V1 Service → V1 SDK → Azure

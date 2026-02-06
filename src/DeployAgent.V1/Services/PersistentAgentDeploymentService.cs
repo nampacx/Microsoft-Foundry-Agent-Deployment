@@ -285,7 +285,7 @@ public class PersistentAgentDeploymentService : IAgentDeploymentService
                 throw new InvalidOperationException($"Failed to create agent '{agentName}': {ex.Message}", ex);
             }
         }
-        else if (agent.Instructions != instructions || agent.Tools.Count != tools.Count)
+        else if (agent.Instructions != instructions || agent.Tools.Count != tools.Count|| agent.Model != modelDeploymentName)
         {
             Console.WriteLine("  → Updating existing agent.");
 

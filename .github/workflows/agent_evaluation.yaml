@@ -1,0 +1,40 @@
+name: "AI Agent Evaluation"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ENDPOINT: https://nampacx-fndry-2.services.ai.azure.com/api/projects/nampacx-fndry-prjct
+  DEPLOYMENT_NAME: gpt-4o-mini-deployment
+  AGENT_IDS: WeatherAgent
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  run-action:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login using Federated Credentials
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run Evaluation
+        uses: microsoft/ai-agent-evals@v2-beta
+        with:
+          # Replace placeholders with values for your Azure AI Project
+          azure-ai-project-endpoint: ${{env.PROJECT_ENDPOINT}}
+          deployment-name: ${{env.DEPLOYMENT_NAME}}
+          agent-ids: ${{env.AGENT_IDS}}
+          data-path: ${{ github.workspace }}/evaluations/MyTestData.json
